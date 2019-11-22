@@ -1,0 +1,11 @@
+[package]
+name = "rdt"
+version = "0.1.0"
+authors = ["Kody Kantor <kody@kkantor.com>"]
+edition = "2018"
+
+[dependencies]
+libc = "0.2"
+
+[profile.dev]
+panic = "abort"
