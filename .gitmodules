@@ -1,0 +1,3 @@
+[submodule "libusdt"]
+	path = libusdt
+	url = ssh://git@github.com/chrisa/libusdt

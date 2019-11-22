@@ -2,23 +2,25 @@ extern crate libc;
 
 use core::ffi::c_void;
 use std::os::raw::{c_char, c_int};
-use std::ffi::{ CString, CStr };
-use std::ptr;
+use std::ffi::{CString};
 use libc::size_t;
 use std::thread;
 use std::time::Duration;
 
 #[repr(C)]
-struct UsdtProbe { _private: [u8; 0] }
+struct UsdtProbe {
+    isenabled_addr: extern fn(c_void)->c_int,
+    probe_addr: *const c_void,
+}
 
 #[repr(C)]
 struct UsdtProbedef {
     name: *const c_char,
     function: *const c_char,
     argc: size_t,
-    types: *const c_char,
-    probe: *const UsdtProbe,
-    next: *const UsdtProbedef,
+    types: [*const c_char; 32],
+    probe: *mut UsdtProbe,
+    next: *mut UsdtProbedef,
     refcnt: c_int,
 }
 
@@ -36,58 +38,49 @@ struct UsdtProvider {
 extern {
     fn usdt_create_provider(
         name: *const c_char,
-        module: *const c_char) -> *const UsdtProvider;
+        module: *const c_char) -> *mut UsdtProvider;
     fn usdt_create_probe(
         func: *const c_char,
         name: *const c_char,
         argc: size_t,
-        types: *const *const c_char) -> *const UsdtProbedef;
+        types: *const *const c_char) -> *mut UsdtProbedef;
     fn usdt_provider_add_probe(
-        provider: *const UsdtProvider,
-        probedef: *const UsdtProbedef) -> c_int;
-    fn usdt_provider_enable(provider: *const UsdtProvider) -> c_int;
+        provider: *mut UsdtProvider,
+        probedef: *mut UsdtProbedef) -> c_int;
+    fn usdt_provider_enable(provider: *mut UsdtProvider) -> c_int;
     fn usdt_fire_probe(
-        probe: *const UsdtProbe,
+        probe: *mut UsdtProbe,
         argc: size_t,
         argv: *const *const c_char);
     fn usdt_is_enabled(
-        probe: *const UsdtProbe) -> c_int;
+        probe: *mut UsdtProbe) -> c_int;
 }
 
 fn main() {
-    println!("Hello, world!");
-    let name = CString::new("rustprov").expect("CString::new failed");
+
+    /* provider:mod:func:name */
+    let provider = CString::new("rustprov").expect("CString::new failed");
     let module = CString::new("rustmod").expect("CString::new failed");
     let func = CString::new("rustfunc").expect("CString::new failed");
-    let fname = CString::new("rustname").expect("CString::new failed");
-    let types = CString::new("").expect("CString::new failed");
-    let args = CString::new("test").expect("CString::new failed");
+    let name = CString::new("rustname").expect("CString::new failed");
+
+    /* probe argument types */
+    let types = CString::new("char *").expect("CString::new failed");
+
+    /* probe arguments */
+    let args = CString::new("hello from rust!").expect("CString::new failed");
+
     unsafe {
-        let prov = usdt_create_provider(name.as_ptr(), module.as_ptr());
-        println!("provider... name: {:?}, mod: {:?}",
-            CStr::from_ptr((*prov).name),
-            CStr::from_ptr((*prov).module));
-
-        let probedef = usdt_create_probe(func.as_ptr(), fname.as_ptr(), 0,
+        let prov = usdt_create_provider(provider.as_ptr(), module.as_ptr());
+        let probedef = usdt_create_probe(func.as_ptr(), name.as_ptr(), 1,
             &types.as_ptr());
-        println!("probe... func: {:?}, name: {:?}",
-            CStr::from_ptr((*probedef).function),
-            CStr::from_ptr((*probedef).name));
-
-        let created = usdt_provider_add_probe(prov, probedef);
-        println!("created: {}", created);
-
-        let enabled = usdt_provider_enable(prov);
-        println!("enabled: {}, {}", enabled, (*prov).enabled);
+        usdt_provider_add_probe(prov, probedef);
+        usdt_provider_enable(prov);
 
         loop {
-            println!("firing probes...");
-
-            let enabled = usdt_is_enabled((*probedef).probe);
-            println!("enabled: {}", enabled);
-
-            usdt_fire_probe((*probedef).probe, 1, &args.as_ptr());
-            println!("sleeping");
+            if usdt_is_enabled((*probedef).probe) == 1 {
+                usdt_fire_probe((*probedef).probe, 1, &args.as_ptr());
+            }
             thread::sleep(Duration::from_millis(1000));
         }
     }

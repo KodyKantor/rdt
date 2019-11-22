@@ -1,0 +1,21 @@
+# rdt - rust dtrace integration
+
+This is very much just a POC.
+
+# Building
+
+There's a simple makefile that will build libusdt and then use some env vars
+to make sure Cargo notices it.
+
+```
+make
+```
+
+If you're modifying libusdt, you'll need to run `make clean`, or at least
+`cargo clean` before running `make` again. Cargo will not notice if a linked
+library is updated.
+
+# Running:
+```
+$ dtrace -Z -n 'rustprov*:::rustname { printf("%s", copyinstr(arg0))}' -c './target/debug/rdt'
+```
