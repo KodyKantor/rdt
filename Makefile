@@ -1,6 +1,6 @@
 .PHONY:
 all: libusdt
-	RUSTFLAGS="-L$(PWD)/libusdt -lusdt" cargo build
+	cargo build
 
 .PHONY: libusdt
 libusdt:
@@ -10,3 +10,7 @@ libusdt:
 clean:
 	cargo clean
 	$(MAKE) -C libusdt clean
+
+.PHONY: test
+test: all
+	cargo test
